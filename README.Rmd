@@ -1,0 +1,13 @@
+---
+title: "Readme"
+author: "Arjen Gebraad"
+date: "25 tammikuuta 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Open Data Science is a course where will try to understand the priciples and advantages of using open research tools with open data and understand the possibilities of reproducible research. You can find my github repository from here:*
+<https://github.com/gebrawh/IODS-project>
