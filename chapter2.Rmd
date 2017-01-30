@@ -1,7 +1,78 @@
-# Insert chapter 2 title here
+# 2. Regression and model validation
 
-*Describe the work you have done this week and summarize your learning.*
+*We have preprocessed a data set for further analysis and have performed and interpreted regression analysis. The following includes the codes and my explanations and interpretations for the analysis part.*
 
-- Describe your work and results clearly. 
-- Assume the reader has an introductory course level understanding of writing and reading R code as well as statistical methods
-- Assume the reader has no previous knowledge of your data or the more advanced methods you are using  
+1. 
+```{r}
+lrn2014 <- read.table("data/lrn2014.txt", header = TRUE)
+
+str(lrn2014)
+dim(lrn2014)
+```
+lrn2014 is a data set with data from 166 students in 7 variables: age, attitude, points, gender, variable related to deep learning, variable related to surface learning and a variable related to strategic learning.
+
+2.
+```{r}
+library(GGally)
+library(ggplot2)
+
+ggpairs(lrn2014, mapping = aes(alpha = 0.3), lower = list(combo = wrap("facethist", bins = 20)))
+
+summary(lrn2014)
+```
+
+- age: the median age is 22, the major part of participants are of around this age with few acceptions in higher age groups
+
+- attitude: follows a normal distribution. Shows highest correlation with the variable points.
+
+- points: shows a left-tailed skweded distribution
+
+- gender: almost twice as many females than males (110 vs 56), no obvious relationship with other parameters.
+
+- deep: slightly left-tailed skewed distribution. Negative correlation with surface learning.
+
+- surf: slightly right-tailed skewed distribution. Slight negative correlation with attitude and points.
+
+- stra: normally distributed. Slight positive correlation with points.
+
+3.
+
+```{r}
+lm.lrn2014.1 <- lm(Points ~ Attitude + surf + stra , data = lrn2014)
+summary(lm.lrn2014.1)
+```
+
+in lm.lrn2014.1, surf and stra do not have a statistically significant relationship with points (alpha = 0.05)
+
+
+```{r}
+lm.lrn2014.2 <- lm(Points ~ Attitude + stra, data = lrn2014)
+summary(lm.lrn2014.2)
+```
+
+in lm.lrn2014.2, stra does not have a statistically significant relationship with points (alpha = 0.05)
+
+```{r}
+lm.lrn2014.3 <- lm(Points ~ Attitude, data = lrn2014)
+summary(lm.lrn2014.3)
+```
+
+in lm.lrn2014.3, attitude has a statistically significant relationship with points (alpha = 0.05)
+
+4.
+
+- The model shows that the target variable points is expected to increase 0.35 when the attitude increases by 1. The t value and P value correspond to the statistical test with the null hypothesis that the parameter would be 0.
+
+- The multiple R-squared is the fraction of the target variable points that is explained by the model. In this csae, 19% of the variation in points is explained by the model.
+
+5.
+```{r}
+par(mfrow = c(2,2))
+plot(lm.lrn2014.3, which = c(1,2,5))
+```
+
+The model obviously assumes linearity, but also a normal distribution of the errors, that the errors are not correlated and have a constant variance. The latter means that the size of the error does not depend on the explanatory variables.
+
+- residuals vs Fitted: Any pattern in the residuals vs fitted plot would indicate a problem with the assumption of constant error and independence of explanatory variables. For our model, this plot shows a cloud of randomly distributed points, indicating that this assumption is met.
+- Q-Q qplot: the better the data point fit with the line, the better the normality assumption is met. In our model, there is a reasonable fit with the line.
+- Residuals vs Levarage: this plot helps to identify data points with unusually high impact. Our data does not show single points with high leverage.
