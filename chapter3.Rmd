@@ -1,0 +1,266 @@
+# 3. Logistic regression
+
+*We have preprocessed a data set on student alcohol consumption from the UCI Machine Learning Repository for further analysis. The exercise focuses on exploring the data and performing and interpreting logistic regression analysis. The following includes the codes and my explanations and interpretations for the analysis part.*
+
+## 2) Reading the data into R
+
+I read the joined student alcohol consumption data into R from my local folder: 
+```{r}
+alc <- read.csv("data/alc.csv", header = TRUE, sep = ",")
+
+colnames(alc)
+```
+Alc includes the data on student alcohol consumption from the UCI Machine Learning Repository.  It includes the alcohol usage and the social, gender and study time attributes for 382 students in 36 variables.
+
+## 3) Hypotheses
+Let's have a glimpse at the data:
+```{r}
+library(dplyr)
+glimpse(alc)
+```
+
+
+I am interested in the relationship between high/low alcohol use and age, gender, the frequency of going out with friends and the health condition of the students.
+
+- My assumption is that high alcohol consumption becomes more likely at higher age (the ages of the subjects are between 15 and 22 years of age), because older students have more to spend and have more possibilities to buy alcohol.
+
+- I think that boys are more likely to have high alcohol consumption compared to girls, since they want to show off.
+
+- I expect that students who go out with friends more often have higher alcohol consumption.
+
+- I think that the health condition is worse for students that have high alcohol consumption. Not just because alcohol is bad for one's health, but also because people who drink less tend to be more concious about their health in general.
+
+## 4) Distribution of the chosen variables and relationship with alcohol consumption
+We explored the distribution of the chosen variables and their relationship with alcohol consumption.
+
+### Age
+
+```{r}
+# access the tidyverse libraries dplyr and ggplot2
+library(dplyr); library(ggplot2)
+
+# Produce a cross-tabulation for age and high use of alcohol
+mytable <- table(age = alc$age,high_use = alc$high_use)
+mytable
+
+# A cross-tabulation with fractions for age and high use of alcohol
+prop.table(mytable, 1)
+
+# initialize a plot of high_use and age
+g1 <- ggplot(alc, aes(x = age, y = alc_use, group = age))
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("alcohol use")
+
+
+```
+
+Alcohol consumption seems to increase with age if we disregard the higher age group (19-22), because of the lack of data. Also the fraction of student's that have a high use of alcohol (TRUE) shows an increasing trend increases between 15-18 years of age, although not as cleary.
+
+### Gender
+
+```{r}
+# Produce a cross-tabulation for sex and high use of alcohol
+mytable <- table(gender = alc$sex, high_use = alc$high_use)
+mytable
+# A cross-tabulation with fractions for sex and high use of alcohol
+prop.table(mytable, 1) %>% addmargins()
+
+# initialize a plot of high_use and G1
+g1 <- ggplot(alc, aes(x = sex, y = alc_use))
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("alcohol use") + xlab("gender")
+
+```
+
+The fraction of students with high intake of alcohol is almost twice as high among boys (39%) compared to girls (21%), confirming my hypothesis. The median alcohol consumption per week is also higher. The variation is higher in boys compared to girls.
+
+### Going out
+```{r}
+# Produce a cross-tabulation for going-out frequency and high use of alcohol
+mytable <- table(Going_out_frequency = alc$goout, high_use = alc$high_use)
+mytable
+# A cross-tabulation with fractions for going-out frequency and high use of alcohol
+prop.table(mytable, 1)
+
+# initialize a plot of high_use and goout
+g1 <- ggplot(alc, aes(x = goout, y = alc_use, group = goout))
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("alcohol use") + xlab("Going-out_frequency (arbitrary scale)")
+
+
+```
+
+Of course, alcohol consumption is higher in students that go out more often. Both the weekly consumption and the percentage of students with high alcohol intake are substantially higher when they go out more frequently.
+
+### Health
+```{r}
+# Produce a cross-tabulation for health and high use of alcohol
+
+mytable <- table(Health_status = alc$health, high_use = alc$high_use)
+mytable
+# A cross-tabulation with percentages for health and high use of alcohol
+prop.table(mytable, 1)
+
+# initialize a plot of high_use and goout
+g1 <- ggplot(alc, aes(x = health, y = alc_use, group = health))
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("alcohol use") + xlab("Health status (arbitrary scale)")
+
+
+```
+
+From this data set, we can not find a relationship between alcohol consumption and the students' health status. At this young age, there is not yet an effect of high alcohol intake on how the students grade their health status.
+
+##5) Logical regression
+We explore the relationship between the chosen variables and the binary high/low alcohol consumption variable as the target variable:
+```{r}
+# find the model with glm()
+m <- glm(high_use ~ age + sex + goout + health, data = alc, family = "binomial")
+
+# print out a summary of the model
+summary(m)
+```
+
+Two of the chosen predictor variables,gender and going-out frequency, are found to be significant predictors of high/low alcohol consumption. Men and frequent 'clubbers' are more likely to consume a lot of alcohol.
+
+The following table shows the odds ratios for our predictor variables with 95%-confidence interval:
+
+```{r}
+# compute odds ratios (OR)
+OR <- coef(m) %>% exp
+
+# compute confidence intervals (CI)
+CI <- confint(m) %>% exp
+
+# print out the odds ratios with their confidence intervals
+cbind(OR, CI)
+
+```
+
+The odds ratio for gender (sexM) tells that boys have a 2.3 (95%-CI 1.4-3.8) times higher chance to be big users of alcohol compared to girls. The odds ratio for going out tells us that a unit increase of this variable (on a scale from 1-5) will increase the chance of being a heavy drinker by 2.1 (95%-CI 1.7-2.7). The confidence intervals of the odds ratios for age and health include 1, meaning that we cannot say for certain if an increase in these variables increase or descrease the probability of being a heavy drinker.
+
+## 6) Performance of the model
+
+We defined a model for variables for which we had found a statistical relationship with high/low alcohol consumption. We made predictions of high alcohol consumption based on this model. 
+```{r}
+# define the model with the variables that had a statistical relationship with high/low alcohol consumption
+m2 <- glm(high_use ~ sex + goout, data = alc, family = "binomial")
+
+# predict() the probability of high_use
+probabilities <- predict(m, type = "response")
+
+# add the predicted probabilities to 'alc'
+alc <- mutate(alc, probability = probabilities)
+
+# use the probabilities to make a prediction of high_use
+alc <- mutate(alc, prediction = probability > 0.5)
+```
+
+To evaluate the predicitve power of our model, we tabulated the predictions versus the actual values of high_use:
+```{r}
+# tabulate the target variable versus the predictions
+my.table <- table(high_use = alc$high_use, prediction = alc$prediction)
+my.table
+
+# tabulate the  fractions of target variable versus the predictions
+prop.table(my.table,1) %>% addmargins()
+
+```
+
+This is a graphic visualization of the predictions and their actual values:
+```{r}
+# initialize a plot of 'high_use' versus 'probability' in 'alc'
+g <- ggplot(alc, aes(x = probability, y = high_use, col = prediction))
+
+# define the geom as points and draw the plot
+g + geom_point()
+```
+
+We computed the training error by calculating the total proportion of inaccurately classified individuals.
+```{r}
+# define a loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# call loss_func to compute the average number of wrong predictions in the (training) data
+loss_func(class = alc$high_use, prob = alc$probability)
+
+```
+
+The model is good at identifying the individuals having low alcohol consumption, classifying these individuals correctly in 92.5% of the cases. The model performs poorly when it comes to the heavy drinkers, predicting them to have low alcohol consumption 55% of the time. 
+ knowing that most students are not heavy drinkers (I am very naive), I would've guessed that predicted that none of the students is a heavy drinker. In that case I would have guessed wrong in (114 heavy drinkers /  382 individuals in total =) 29.8% of the time. Mainly by picking out 45% of the heavy drinkers, the model performs slightly better than my naive guessing strategy: the model's overal training error was 21.7%.
+ 
+## 7 Bonus) 10-fold cross-validation
+ 
+ To test the model in a test-set (not used for training the model), We performed a 10-fold cross-validation. The performance error for the test set is given as output:
+
+```{r}
+# K-fold cross-validation
+library(boot)
+cv <- cv.glm(data = alc, cost = loss_func, glmfit = m, K = 10)
+
+# average number of wrong predictions in the cross validation
+cv$delta[1]
+```
+
+In the test set, the model makes a wrong prediction in around 23% of the cases. Our model performs better compared to the model introduced in DataCamp, which had about 0.26 error.
+
+
+## 8 Super-Bonus) Comparing the performance of different logistic regression models
+
+We compared the performance of different logistic regression models. We defined models using 1 to as many as 27 prediction variables and evaluated the average number of wrong predictions in the training-set as well as the test error from a 10-fold cross-validaiton. 
+ 
+
+```{r}
+cv.error <- 0
+train.error <- 0
+
+# define models using 1 to 27 prediction variables
+for(numbofpred in 1:27) {
+
+predvars <- paste(colnames(alc)[1:numbofpred], collapse = " + ")
+m.formula <- paste("high_use ~ ", predvars) %>% as.formula()
+m3 <- glm(m.formula, data = alc, family = "binomial")
+
+# predict() the probability of high_use
+probabilities <- predict(m3, type = "response")
+
+# add the predicted probabilities to 'alc'
+alc <- mutate(alc, probability3 = probabilities)
+
+# use the probabilities to make a prediction of high_use
+alc <- mutate(alc, prediction3 = probability3 > 0.5)
+
+# compute the average number of wrong predictions in the (training) data
+train.error[numbofpred] <- loss_func(class = alc$high_use, prob = alc$probability3)
+
+# K-fold cross-validation
+cv <- cv.glm(data = alc, cost = loss_func, glmfit = m3, K = 10)
+
+# average number of wrong predictions in the cross validation
+cv.error[numbofpred] <- cv$delta[1]
+
+}
+```
+
+The test and training errors were plotted against the number of prediction variables used in the model.
+```{r}
+plot(cv.error, xlab = "number of prediction variables", ylab="prediction error", ylim=c(0.2, 0.4))
+points(train.error, pch = 0)
+legend("topleft", legend = c("test error", "training error"), pch = c(1,0))
+
+```
+
+The training error will always decrease with increasing model complexity (adding more prediction variables), but this will not necessarily improve the test error. When the complexity gets too high for the amount of data, the model gets biased by the noise present in the data. (Reference: https://www.cs.nyu.edu/~roweis/csc2515-2003/notes/lec11x.pdf)
+
+
+
+
+
+
