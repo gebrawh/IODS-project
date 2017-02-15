@@ -1,0 +1,266 @@
+# 4. Clustering and classification
+
+##2. The Boston dataset
+```{r}
+# access the MASS package
+library(MASS)
+
+# load the data
+data("Boston")
+
+# explore the dataset
+str(Boston)
+dim(Boston)
+```
+The data set contains data for suburbs in the Boston metropolitan area. It includes variables that affect the value of homes, such as crime rate, pollution (NOX concentration) and accessibility to radial highways. The data set includes 506 observations described in 14 variables. 
+
+##3. Exploring the Boston data set
+```{r}
+summary(Boston)
+
+pdf(file = "plots/Boston_pairplot.pdf")
+pairs(Boston, lower.panel = NULL, gap=0.5, pch = 16, cex =0.1)
+dev.off()
+
+
+
+library(corrplot)
+
+cor_matrix<-cor(Boston) 
+corrplot(cor_matrix, method="circle", type = "upper", cl.pos = "b", tl.pos = "d", tl.cex = 0.6)
+
+
+```
+
+Pair-plots of the Boston data can be found from [here](plots/Boston_pairplot.pdf): 
+
+According to the correlation matrix, there is a strong positive correlation between accessibility to radial highways (rad) and the full-value property-tax rate (tax), although this does not show that clearly from the pair-plot. This strong correlation seems to be caused by outliers.
+
+The proportion of non-retail business acres per town (indus) has strong positive correlaiton with air pollution (nox), the full-value property-tax rate (tax) and the percentage of the population with lower status (lstat), which is to be expected in towns with industry. Non-retail businesses (indus) are often in close proximity to employment centres (dis). The proportion of owner-occupied units built prior to 1940 (age) is often bigger in areas with industry.
+
+Crime rate (crim) tends to be higher in towns with good accessibility to radial highways (rad) and a high property-tax rate (tax).
+
+The median value of the owner-occupied homes (medv) has a strong positive correlation with the average number of rooms per dwelling (rm) and a strong negative correlation with the percentage of the population with lower status. The lower class lives in smaller homes with lower value.
+
+The Boston metropolitan area is a mainly white area. The variable black is high when the proportion of blacks is low. The median value is 391.4, which corresponds to 0.4% blacks.
+
+##4. Some more data wrangling
+The data was standardized and summaries of the standardized data were printed:
+```{r}
+# center and standardize variables
+boston_scaled <- scale(Boston)
+
+# summaries of the scaled variables
+summary(boston_scaled)
+var(boston_scaled)
+
+
+```
+The mean of the variables was set to 0 and variance to 1.
+
+The crim variable was taken out and converted into a categorical variable, using the quantiles as bins.
+```{r}
+# change the object to data frame
+boston_scaled <- as.data.frame(boston_scaled)
+
+# save the scaled crim as scaled_crim
+scaled_crim <- boston_scaled$crim
+
+# create a quantile vector of crim and print it
+bins <- quantile(scaled_crim)
+
+# create a categorical variable 'crime'
+crime <- cut(scaled_crim, breaks = bins, include.lowest = TRUE, label = c("low", "med_low", "med_high", "high"))
+
+# look at the table of the new factor crime
+table(crime)
+
+# remove original crim from the dataset
+boston_scaled <- dplyr::select(boston_scaled, -crim)
+
+# add the new categorical value to scaled data
+boston_scaled <- data.frame(boston_scaled, crime)
+```
+The dataset was divided into a train set with 80% of the observations and a test set with the remaining 20%:
+
+```{r}
+# number of rows in the Boston dataset 
+n <- nrow(boston_scaled)
+
+# choose randomly 80% of the rows
+ind <- sample(n,  size = n * 0.8)
+
+# create train set
+train <- boston_scaled[ind,]
+
+# create test set 
+test <- boston_scaled[-ind,]
+```
+##5. Linear discriminant analysis
+
+A linear discriminant analysis (LDA) was performed using the categorical crime variable as a target variable and all other variables as predictor variables. A LDA biplot was drawn:
+
+```{r}
+# linear discriminant analysis
+lda.fit <- lda(crime ~ . , data = train)
+
+# the function for lda biplot arrows
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(train$crime)
+
+# plot the lda results
+plot(lda.fit, dimen = 2, col = classes, pch = classes)
+lda.arrows(lda.fit, myscale = 1)
+```
+
+The most influencial linear separator for crime rate is accessibility to radial highways (rad).
+
+##6. Prediction of classes with the LDA model on the test data
+
+Using our LDA model, we predicted the crime classes based on the test data. Results were cross tabulated:
+
+```{r}
+# save the correct classes from test data
+correct_classes <- test$crime
+
+# remove the crime variable from test data
+test <- dplyr::select(test, -crime)
+
+# predict classes with test data
+lda.pred <- predict(lda.fit, newdata = test)
+
+# cross tabulate the results
+table(correct = correct_classes, predicted = lda.pred$class)
+
+```
+The model is good at predicting the high classes from the test data, but has more difficulty with the lower classes.
+
+##7. K-means clustering
+The Boston dataset was reloaded and scaled. The euclidean distances between the observations were calculated and k-means clustering for 10 centres was performed. A graphical representation of this clustering can be found from [here](plots/Boston_cluster_K10.pdf).
+
+```{r}
+boston_scaled <- scale(Boston)
+
+dist_eu <- dist(boston_scaled)
+
+# k-means clustering
+km <-kmeans(dist_eu, centers = 10)
+
+# plot the Boston dataset with clusters
+pdf(file = "plots/Boston_cluster_K10.pdf")
+pairs(Boston, col = km$cluster, lower.panel = NULL, gap=0.5, pch = 16, cex =0.1)
+dev.off()
+
+```
+We looked for the optimal number of clusters by caclulating the total within cluster sum of squares (TWCSS) for 1 to 10 clusters. The results were plotted:
+```{r}
+set.seed(123)
+
+# determine the number of clusters
+k_max <- 10
+
+# calculate the total within sum of squares
+twcss <- sapply(1:k_max, function(k){kmeans(dist_eu, k)$tot.withinss})
+
+# visualize the results
+plot(1:k_max, twcss, type='b')
+```
+
+The optimal number of clusters is when the TWCSS drops radically. In this case at 2 clusters:
+
+```{r}
+# k-means clustering
+km <-kmeans(dist_eu, centers = 2)
+
+# plot the Boston dataset with clusters
+pdf(file = "plots/Boston_cluster_Kopt.pdf")
+pairs(Boston, col = km$cluster, lower.panel = NULL, gap=0.5, pch = 16, cex =0.1)
+dev.off()
+```
+A graphical representation of the clusters can be found from [here](plots/Boston_cluster_Kopt.pdf). The data clusters roughly in a cluster (in red) with low crime rate (low crim), small proportion of industry (low indus), less air pollution (low nox), new buildings (low age), large distance to employment centres (high dis), high status of the population (low lstat) and high value of owner-occupied homes (high medv). And another cluster (in black) with high crime rate (high crime), big proportion of industry (high indus), more air pollution (high nox), old buildings (high age), small distance to employment centres (low dis), low status of the population (high lstat) and low value of owner-occupied homes (low medv). We are dealing here with a classic divide into upper class suburbs and working class neighbourhoods.
+
+## Bonus: Some more clustering
+The data was clustered into 5. 
+
+```{r}
+# k-means clustering
+km <-kmeans(dist_eu, centers = 5)
+
+# plot the Boston dataset with clusters
+pdf(file = "plots/Boston_cluster_pairplot_K5.pdf")
+pairs(Boston, col = km$cluster, lower.panel = NULL, gap=0.5, pch = 16, cex =0.1)
+dev.off()
+```
+A graphical representation can be found from [here](plots/Boston_cluster_pairplot_K5.pdf).
+Using the clusters as target clasess, LDA was performed. 
+
+```{r}
+# change the object to data frame
+boston_scaled <- as.data.frame(boston_scaled)
+
+# linear discriminant analysis
+lda.fit.clusters <- lda(km$cluster ~ . , data = boston_scaled)
+
+# the function for lda biplot arrows
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(km$cluster)
+
+# plot the lda results
+pdf(file = "plots/Boston_cluster_LDA.pdf")
+plot(lda.fit.clusters, dimen = 2, col = classes, pch = classes)
+lda.arrows(lda.fit.clusters, myscale = 3)
+dev.off()
+```
+The results are shown [here](plots/Boston_cluster_LDA.pdf) as a biplot.
+Variables dealing with real estate property (medv, zn and also tax), air pollution (nox) and sadly also skin colour (black) are influencial linear separators for class.
+
+## Super-Bonus
+
+The following plot is a projection of the model predictors for crime rate. The colour denotes the crime categories.
+
+```{r}
+model_predictors <- dplyr::select(train, -crime)
+
+# check the dimensions
+dim(model_predictors)
+dim(lda.fit$scaling)
+
+# matrix multiplication
+matrix_product <- as.matrix(model_predictors) %*% lda.fit$scaling
+matrix_product <- as.data.frame(matrix_product)
+
+
+library(plotly)
+plot_ly(x = matrix_product$LD1, y = matrix_product$LD2, z = matrix_product$LD3, type= 'scatter3d', mode='markers', color = train$crime)
+
+```
+In the following plot, the colour denotes 4 clusters produced by k-means analysis.
+```{r}
+# k-means clustering
+dist_eu <- dist(train)
+km <-kmeans(dist_eu, centers = 4)
+
+library(plotly)
+plot_ly(x = matrix_product$LD1, y = matrix_product$LD2, z = matrix_product$LD3, type= 'scatter3d', mode='markers', color = km$cluster)
+```
+The crime categories are quite nicely separated in the projection of model predictors. Observations with high crime rates are separated from the other observations. The 4 clusters from the k-means clustering do not completely overlap with crime categories. Cluster 3 has greates overlap with the high crime rate category. However, the clustering depends on the training set which is different every time I knit the file.
+
+
