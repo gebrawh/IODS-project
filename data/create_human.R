@@ -29,8 +29,34 @@ gii <- mutate(gii, labour_ratio = labour_F / labour_M)
 library(dplyr)
 human <- inner_join(hd, gii, by = "country")
 
-# make sure everything is in order, Save the joined and modified data set to the 'data' folder
 
-glimpse(human)
 
-write.csv(human, file = "human.csv")
+# remove the commas from GNI and print out a numeric version of it
+library(stringr)
+GNI.num <- str_replace(human$GNI, pattern=",", replace ="")  %>% as.numeric
+
+# apply changes to data
+human <- mutate(human, GNI = GNI.num)
+
+# columns to keep
+keep <- c("country", "edu2_ratio", "labour_ratio", "life_exp", "edu_exp", "GNI", "maternal_mortality", "adolescent_birth", "parliament_repr")
+
+# select the 'keep' columns
+human <- select(human, one_of(keep))
+
+# filter out all rows with NA values
+human <- filter(human, complete.cases(human))
+
+# define the last indice we want to keep
+last <- nrow(human) - 7
+
+# choose everything until the last 7 observations
+human <- human[1:last,]
+
+# add countries as rownames
+rownames(human) <- human$country
+
+# remove the Country variable
+human <- select(human, -country)
+
+write.csv(human, "human.csv", row.names = TRUE)

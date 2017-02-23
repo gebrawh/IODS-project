@@ -1,0 +1,153 @@
+# 5. Dimensionality reduction techniques
+
+##1. The human dataset
+```{r}
+
+# load the data
+human <- read.csv("data/human.csv")
+
+# add countries as rownames
+rownames(human) <- human$X
+
+# explore the dataset
+str(human)
+dim(human)
+```
+The human dataset includes data from 155 countries on human development and gender inequality from the  human development reports from the United Nations. Variables describing human development are life expectancy at birth (life_exp), expected years of schooling (edu_exp) and gross national income per capita (GNI). Gender inequality is described by the ratio between women and men with at least secondary education (edu2_ratio), the ratio between female and male particiation rates in the labour force (labour_ratio), the maternal mortality ratio (maternal_mortality), the birth rate among adolescents (adolescent_birth) and percentage of female representation in parliament (parliament_repr).
+
+##2. Exploring the human data set
+```{r}
+library(GGally)
+library(dplyr)
+
+
+human_ <- select(human, -X)
+
+# visualize the variables
+ggpairs(human_)
+
+
+library(corrplot)
+
+cor_matrix<-cor(human_) 
+corrplot(cor_matrix, method="circle", type = "upper", cl.pos = "b", tl.pos = "d", tl.cex = 0.6)
+
+summary(human_)
+
+
+```
+For the ratio between women and men with at least secondary education (edu2_ratio), half of the countries have ratios between 0.73 and 1, very few countries have more women than men with at least secondary education.
+
+The ratio between female and male particiation rates in the labour force (labour_ratio) is between 0.60 and 0.85 in 50% of the countries. There are only four countries where more women than men are participating in the labour force.
+
+The life expectancy at birth (life_exp) varies a lot between countries, from a minimal of 49 to a maximum of 83.5. In 50% of countries, life expentancy is between 66 and 77.
+
+The expected years of schooling (edu_exp) is normally distributed. There is huge variation between countries, varying between a minimal of 5 to a maximum of 20 years of education.
+
+Wealth is not fairly distributed over countries, as the distribution of gross national income per capita (GNI) shows us. The richest country has a GNI per capita that is 10 times the mean GNI per capita and the poorest country has less than a 20th of the median.
+
+Maternal mortality ratio is below 200 for most countries, but there are a few countries for which the maternal mortality ratio is fairly high.
+
+Most countrie shave adolescent birth rate below 50
+
+The representation of women in parliament is only 20% in most countries. Only 2 countries have representation of higher than 50%.
+
+There are strong positive correlations between life expectancy and expected years of schooling. As life is longer, people spend more time at school. The maternal mortality rate and adolescent birth rate have strong positive correlation. There is a strong negative correlation between life expectany and maternal mortality rate. Both variables describe the quality of health care in a country. Consequently, life expectancy and expected years of schooling both have strong negative correlation with maternal mortality rate and adolescent birth rate.
+
+##3. Principal component analysis (PCA)
+
+A principal component analysis (PCA) was performed on the data.
+
+```{r}
+# perform principal component analysis (with the SVD method)
+pca_human <- prcomp(human_)
+
+summary(pca_human)
+
+# draw a biplot of the principal component representation and the original variables
+pdf(file = "plots/human_pca.pdf")
+biplot(pca_human, choices = 1:2, cex = c(0.5, 1), col = c("grey40", "red"))
+dev.off()
+
+```
+A biplot of the PCA can be found [here](plots/human_pca.pdf). Now, mostly GNI per capita describes the variance, because the variance is so big (and the unit relatively small).
+
+
+##4. Principal component analysis (PCA) after standardizing
+
+The PCA was performed again after the variables had been standardized (variance normalized to 1) and. 
+```{r}
+# standardize the variables
+human_std <- scale(human_)
+
+# perform principal component analysis (with the SVD method)
+pca_human_std <- prcomp(human_std)
+
+summary(pca_human)
+
+# Change the labels of the arrows
+rownames(pca_human_std$rotation) <- c("gender equality in education","gender equality in the work","life expectancy","duration of schooling","income","maternal mortality rate","adolescent birth rate","representation of women in politics")
+
+# draw a biplot of the principal component representation and the original variables
+pdf(file = "plots/human_std_pca.pdf")
+biplot(pca_human_std, choices = 1:2, cex = c(0.5, 0.3), col = c("grey40", "red"))
+dev.off()
+```
+
+The resulting biplot from the principal component analysis on standardized data can be found [here](plots/human_std_pca.pdf). The labels for the original features have been made more descriptive. 
+
+##5. Interpretation of of the first two principal component dimensions
+I would interpret principal component 1 as describing both the wealth and the quality and accessibility of health care and education in a country. Wealthier countries can be found on the left.
+Principal component 2 describes gender equality and position of women. The most gender equal countries are found at the top.
+
+
+##6. The tea dataset
+
+The data used here concern a questionnaire on tea. 300 individuals were asked how they drink tea (18 questions), what their product's perception is (12 questions) and some personal details (4 questions) (from: https://artax.karlin.mff.cuni.cz/r-help/library/FactoMineR/html/tea.html).
+```{r}
+library(FactoMineR)
+
+data("tea")
+
+#Exploring the tea data
+summary(tea)
+str(tea)
+dim(tea)
+
+#drop the age (factorized in age_Q)
+tea <- select(tea, -age)
+
+library(ggplot2)
+library(tidyr)
+
+# visualize the dataset
+dev.new(width=5, height=50)
+pdf(file = "plots/tea_ggplot.pdf")
+gather(tea) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar() + theme(axis.text.x = element_text(angle = 30, hjust = 1, size =4 ))
+dev.off()
+
+```
+
+Bar plot of the different questions can be found [here](plots/tea_ggplot.pdf). The questionnaire includes many questions. I descided to focus on age of the consumer, position of the consumer in the labour market, price range of the tea, wether or not the thea is consumed in a tea room and where the tea is bought from. I performed multiple correspondence analysis (MCA).
+
+```{r}
+# column names to keep in the dataset
+keep_columns <- c("age_Q", "price", "SPC", "tearoom", "where")
+
+# select the 'keep_columns' to create a new dataset
+my_tea <- select(tea, one_of(keep_columns))
+
+# multiple correspondence analysis
+mca <- MCA(my_tea, method = "indicator", graph = FALSE)
+
+# summary of the model
+summary(mca)
+
+# visualize MCA
+pdf(file = "plots/tea_mca.pdf")
+plot(mca, invisible=c("ind"), habillage = "quali")
+dev.off()
+```
+A variable biplot of the MCA can be found from [here](plots/tea_mca.pdf).
+
+The MCA has difficulty in finding a limited number of dimensions that describe the underlying structure. The first two dimension explain only a bit more than 20% of the variance. In the MCA factor map, non-workers and people over 60 years of age stand most out from other tea drinkers. They are relatively close and could describe the retired tea drinker. Students and people between 15-24 are closest to the cheaply priced tea, although branded and even privat label teas are not too far off. Chain stores are popular among this group. The upscale priced teas are popular among middle-aged groups, often bought from specialized tea shops.
